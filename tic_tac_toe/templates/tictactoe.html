@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Tic Tac Toe</title>
+  <style>
+    body { font-family: Arial; text-align: center; background: #eee; }
+    h1 { font-size: 2em; margin-top: 20px; }
+    .board { display: grid; grid-template-columns: repeat(3, 100px); gap: 5px; justify-content: center; margin: 20px auto; }
+    .cell { width: 100px; height: 100px; background: #fff; border: 2px solid #444; font-size: 2em; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+    .cell.win { background-color: #b2f2bb; font-weight: bold; }
+    select, button, label { margin: 10px; padding: 8px; font-size: 1em; }
+    #status, #score, #player-label { margin-top: 10px; font-size: 1.1em; }
+  </style>
+</head>
+<body>
+  <h1>🎮 Tic Tac Toe</h1>
+
+  <div>
+    <label>Mode:</label>
+    <select id="mode" onchange="onModeChange()">
+      <option value="ai">AI</option>
+      <option value="pvp">Multiplayer</option>
+    </select>
+
+    <span id="ai-options">
+      <label>Difficulty:</label>
+      <select id="difficulty">
+        <option value="easy">Easy</option>
+        <option value="medium" selected>Medium</option>
+        <option value="hard">Hard</option>
+      </select>
+
+      <label><input type="checkbox" id="aiFirst" onchange="restartGame()"> AI goes first</label>
+    </span>
+  </div>
+
+  <div id="player-label"></div>
+
+  <div class="board" id="board"></div>
+  <div id="status">
+    Your turn!
+  </div>
+  <div id="score"> X: 0 | O: 0 | Draws: 0</div>
+  
+  <button id="restart-btn" onclick="restartGame()"
+    style="position: absolute; top: 90%; right: 30px; transform: translateY(-50%);
+          padding: 10px 15px; font-size: 1em; display: none;">
+    🔁 Restart
+  </button>
+
+  <script>
+
+    let multiplayerStartIsX = true;
+    let aiThinking = false;
+    let board = Array(9).fill(" ");
+    let currentPlayer = "X";
+    let gameOver = false;
+    let scores = { X: 0, O: 0, draw: 0 };
+    let winningCells = [];
+
+    function render() {
+      const boardEl = document.getElementById("board");
+      boardEl.innerHTML = "";
+      board.forEach((val, i) => {
+        const cell = document.createElement("div");
+        cell.className = "cell";
+        cell.textContent = val;
+        if (winningCells.includes(i)) {
+          cell.classList.add("win");
+        }
+        cell.onclick = () => makeMove(i);
+        boardEl.appendChild(cell);
+      });
+    }
+
+    function makeMove(index) {
+      if (board[index] !== " " || gameOver || aiThinking) return;
+
+      const mode = document.getElementById("mode").value;
+      board[index] = currentPlayer;
+      render();
+      if (checkWinner()) return;
+
+      if (mode === "ai" && currentPlayer === "X") {
+        currentPlayer = "O";
+        aiThinking = true;
+        document.getElementById("status").textContent = "AI is thinking...";
+
+        setTimeout(() => {
+          fetch("/tic-tac-toe/ai-move", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              board: board,
+              difficulty: document.getElementById("difficulty").value
+            })
+          })
+          .then(res => res.json())
+          .then(data => {
+            board[data.move] = "O";
+            render();
+            checkWinner();
+            currentPlayer = "X";
+            aiThinking = false;
+            if (!gameOver) {
+              document.getElementById("status").textContent = "Your turn!";
+            }
+          });
+        }, 300);
+      } else {
+        currentPlayer = currentPlayer === "X" ? "O" : "X";
+        document.getElementById("status").textContent = `${currentPlayer}'s turn`;
+      }
+    }
+    
+    function checkWinner() {
+      const win = [
+        [0,1,2],[3,4,5],[6,7,8],
+        [0,3,6],[1,4,7],[2,5,8],
+        [0,4,8],[2,4,6]
+      ];
+
+      for (let [a, b, c] of win) {
+        if (board[a] !== " " && board[a] === board[b] && board[b] === board[c]) {
+          winningCells = [a, b, c];
+          render();
+
+          const mode = document.getElementById("mode").value;
+          if (mode === "ai") {
+            document.getElementById("status").textContent =
+              board[a] === "X" ? "You won!" : "AI won!";
+          } else {
+            document.getElementById("status").textContent = `${board[a]} wins!`;
+          }
+
+          document.getElementById("restart-btn").style.display = "inline-block";
+          scores[board[a]]++;
+          updateScore();
+          gameOver = true;
+          return true;
+        }
+      }
+
+      if (!board.includes(" ")) {
+        document.getElementById("status").textContent = "It's a draw!";
+        document.getElementById("restart-btn").style.display = "inline-block";
+        scores.draw++;
+        updateScore();
+        gameOver = true;
+        return true;
+      }
+
+      return false;
+    }
+
+    function updateScore() {
+      document.getElementById("score").textContent =
+        `🏅 X: ${scores.X} | O: ${scores.O} | Draws: ${scores.draw}`;
+    }
+
+    function restartGame() {
+      document.getElementById("restart-btn").style.display = "none";
+      board = Array(9).fill(" ");
+      gameOver = false;
+      winningCells = [];
+      aiThinking = false;
+      currentPlayer = "X";
+      render();
+
+      const mode = document.getElementById("mode").value;
+      const aiFirst = document.getElementById("aiFirst").checked;
+
+      if (mode === "ai") {
+        document.getElementById("player-label").textContent = "You are X | AI is O";
+        if (aiFirst) {
+          currentPlayer = "O";
+          aiThinking = true;
+          document.getElementById("status").textContent = "AI is thinking...";
+          setTimeout(() => {
+            fetch("/tic-tac-toe/ai-move", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                board: board,
+                difficulty: document.getElementById("difficulty").value
+              })
+            })
+            .then(res => res.json())
+            .then(data => {
+              board[data.move] = "O";
+              render();
+              checkWinner();
+              currentPlayer = "X";
+              aiThinking = false;
+              if (!gameOver) {
+                document.getElementById("status").textContent = "Your turn!";
+              }
+            });
+          }, 300);
+        } else {
+          document.getElementById("status").textContent = "Your turn!";
+        }
+      } else {
+        document.getElementById("player-label").textContent = "Player 1 is X | Player 2 is O";
+        currentPlayer = multiplayerStartIsX ? "X" : "O";
+        document.getElementById("status").textContent = `${currentPlayer}'s turn`;
+        multiplayerStartIsX = !multiplayerStartIsX;
+      }
+    }
+
+    function onModeChange() {
+      const mode = document.getElementById("mode").value;
+      const aiOptions = document.getElementById("ai-options");
+      aiOptions.style.display = (mode === "ai") ? "inline" : "none";
+      restartGame();
+    }
+
+    window.onload = () => {
+      onModeChange();
+    };
+  </script>
+  
+</body>
+</html>

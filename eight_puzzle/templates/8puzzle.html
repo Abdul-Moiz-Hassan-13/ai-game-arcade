@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>8 Puzzle Game</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      background: #f7f7f7;
+      padding: 20px;
+    }
+
+    h1 {
+      font-size: 2em;
+      margin-bottom: 10px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, 80px);
+      gap: 5px;
+      justify-content: center;
+      margin: 20px auto;
+    }
+
+    .tile {
+      width: 80px;
+      height: 80px;
+      line-height: 80px;
+      font-size: 24px;
+      font-weight: bold;
+      background: #fff;
+      border: 2px solid #333;
+      cursor: pointer;
+      transition: transform 0.2s ease-in-out;
+      position: relative;
+      user-select: none;
+    }
+
+    .tile.blank {
+      background: #ccc;
+      cursor: default;
+    }
+
+    .feedback {
+      position: absolute;
+      top: -8px;
+      right: -8px;
+      font-size: 18px;
+    }
+
+    #score {
+      font-size: 1.3em;
+      margin-top: 10px;
+      font-weight: bold;
+    }
+
+    button {
+      padding: 10px 15px;
+      margin: 10px;
+      font-size: 1em;
+      background: #4a90e2;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+
+    button:hover {
+      background: #357ab7;
+    }
+  </style>
+</head>
+<body>
+  <h1>📈 8 Puzzle Game</h1>
+
+  <div id="score">Score: 0</div>
+  <div class="grid" id="grid"></div>
+
+  <button onclick="shuffle()">Shuffle</button>
+  <button onclick="getHint()">Hint</button>
+
+  <script>
+    let grid = document.getElementById("grid");
+
+    function updateScore(score) {
+      document.getElementById("score").textContent = `Score: ${score}`;
+    }
+
+    function render(state, feedback = {}) {
+      grid.innerHTML = "";
+      state.forEach((val, i) => {
+        const tile = document.createElement("div");
+        tile.className = "tile" + (val === 0 ? " blank" : "");
+        if (val !== 0) {
+          tile.textContent = val;
+          tile.onclick = () => makeMove(val);
+        }
+        if (feedback[i]) {
+          const fb = document.createElement("div");
+          fb.className = "feedback";
+          fb.textContent = feedback[i] === 'correct' ? "✅" : "❌";
+          tile.appendChild(fb);
+        }
+        grid.appendChild(tile);
+      });
+    }
+
+    function shuffle() {
+      fetch("/8-puzzle/shuffle", { method: "POST" })
+        .then(res => res.json())
+        .then(data => {
+          render(data.state);
+          updateScore(data.score);
+        });
+    }
+
+    function makeMove(tile) {
+      fetch("/8-puzzle/move", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tile })
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.valid) {
+            const feedback = {};
+            const idx = data.state.indexOf(tile);
+            feedback[idx] = data.correct ? 'correct' : 'wrong';
+            render(data.state, feedback);
+            updateScore(data.score);
+
+            if (data.state.join(',') === "1,2,3,4,5,6,7,8,0") {
+              setTimeout(() => {
+                alert("🎉 You solved it! Starting a new puzzle...");
+                shuffle();
+              }, 200);
+            }
+          }
+        });
+    }
+
+    function getHint() {
+      fetch("/8-puzzle/hint")
+        .then(res => res.json())
+        .then(data => {
+          if (!data.done) {
+            render(data.state);
+            updateScore(data.score);
+
+            if (data.state.join(',') === "1,2,3,4,5,6,7,8,0") {
+              setTimeout(() => {
+                alert(`🎉 You solved it! Your final score: ${data.score}. Starting a new puzzle...`);
+                shuffle();
+              }, 200);
+            }
+
+          }
+        });
+    }
+
+    render([1, 2, 3, 4, 5, 6, 7, 8, 0]);
+  </script>
+</body>
+</html>

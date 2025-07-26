@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>AI Game Arcade</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #f5f5f5;
+      text-align: center;
+      margin: 0;
+      padding: 40px 20px;
+    }
+
+    h1 {
+      font-size: 2.5em;
+      margin-top: -10px;
+      margin-bottom: 40px;
+      color: #2c3e50;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 30px;
+      max-width: 1000px;
+      margin: auto;
+    }
+
+    .game-card {
+      background: white;
+      border-radius: 15px;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+      padding: 25px;
+      transition: transform 0.2s, box-shadow 0.2s;
+      cursor: pointer;
+      text-decoration: none;
+    }
+
+    .game-card:hover {
+      transform: translateY(-6px);
+      box-shadow: 0 12px 24px rgba(0, 0, 0, 0.12);
+    }
+
+    .game-card img {
+      width: 100%;
+      height: 160px;
+      object-fit: contain;
+      border-radius: 10px;
+    }
+
+    .game-card .title {
+      margin-top: 15px;
+      font-size: 1.3em;
+      font-weight: bold;
+      color: #34495e;
+      text-decoration: none;
+    }
+
+  </style>
+</head>
+<body>
+  <h1>🎮 Welcome to AI Game Arcade</h1>
+  <div class="grid">
+    <a href="/tic-tac-toe" class="game-card">
+      <img src="/static/tictactoe.png" alt="Tic Tac Toe">
+      <div class="title">Tic Tac Toe</div>
+    </a>
+    <a href="/crypt-arithmetic" class="game-card">
+      <img src="/static/crypt.png" alt="Crypt Arithmetic">
+      <div class="title">Crypt Arithmetic</div>
+    </a>
+    <a href="/8-puzzle" class="game-card">
+      <img src="/static/eight.png" alt="8 Puzzle">
+      <div class="title">8 Puzzle</div>
+    </a>
+    <a href="/personality-evaluator" class="game-card">
+      <img src="/static/personality.png" alt="Personality Evaluator">
+      <div class="title">Personality Predictor</div>
+   </a>
+   <a href="/word-evolver" class="game-card">
+    <img src="/static/genetic.png" alt="Word Evolver">
+    <div class="title">Word Evolver</div>
+  </a>
+  </div>
+</body>
+</html>

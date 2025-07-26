@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Cryptarithmetic Game</title>
+  <style>
+    body { font-family: Arial; text-align: center; background: #f0f0f0; padding: 20px; }
+    h1 { font-size: 2em; margin-top: 10px; margin-bottom: 25px; }
+    .puzzle { font-family: monospace; margin: 20px auto; line-height: 2em; font-size: 1.5em; display: inline-block; text-align: right; white-space: pre; }
+    .input-area { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 20px; }
+    .letter-box { display: flex; flex-direction: column; align-items: center; margin: 5px; }
+    input { width: 40px; text-align: center; font-size: 1.2em; padding: 5px; }
+    .result { font-size: 1.2em; margin-top: 10px; color: red; }
+    .hint { margin-top: 20px; }
+    .tick { color: green; font-weight: bold; }
+    .cross { color: red; font-weight: bold; }
+    select, button { padding: 10px; margin: 10px; font-size: 1em; }
+    #loader {
+      display: none;
+      margin-top: 20px;
+      font-size: 1.2em;
+      color: #333;
+    }
+    #game-container.loading .puzzle,
+    #game-container.loading .input-area,
+    #game-container.loading .hint,
+    #game-container.loading .result,
+    #game-container.loading #score {
+      display: none;
+    }
+    #score {
+      font-size: 1.4em;
+      margin-top: 30px;
+      color: #1e1e1e;
+      font-weight: bold;
+      transition: transform 0.2s ease-in-out;
+    }
+
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      background-color: rgba(0,0,0,0.4);
+    }
+    .modal-content {
+      background-color: #fefefe;
+      margin: 15% auto;
+      padding: 20px;
+      border: 1px solid #888;
+      width: 80%;
+      max-width: 500px;
+      border-radius: 8px;
+    }
+    .close {
+      color: #aaa;
+      float: right;
+      font-size: 28px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .close:hover { color: black; }
+    .modal-input {
+      margin: 10px 0;
+      width: 100%;
+    }
+    .modal-input label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+    .modal-input input {
+      width: 100%;
+      padding: 8px;
+      box-sizing: border-box;
+    }
+    #custom-result {
+      margin-top: 15px;
+      font-weight: bold;
+    }
+    #solution-display {
+      margin-top: 15px;
+      padding: 10px;
+      background: #f0f0f0;
+      border-radius: 4px;
+    }
+    
+    .jump-container {
+      margin: 15px 0;
+    }
+    .jump-container input {
+      width: 60px;
+      padding: 8px;
+      margin: 0 5px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🧠 Cryptarithmetic Puzzle</h1>
+
+  <div>
+    <label for="difficulty">Select Difficulty:</label>
+    <select id="difficulty">
+      <option value="easy" selected>Easy</option>
+      <option value="medium">Medium</option>
+      <option value="hard">Hard</option>
+    </select>
+    <button onclick="openCustomModal()">Custom Puzzle</button>
+  </div>
+
+  <div class="jump-container">
+    <span>Jump to puzzle:</span>
+    <input type="number" id="puzzleIndex" min="1" max="5" value="1">
+    <span id="totalPuzzles">/ 5</span>
+    <button onclick="jumpToPuzzle()">Go</button>
+  </div>
+
+  <div id="game-container">
+    <div id="loader">Loading new puzzle...</div>
+    <div id="score">Score: 0</div>
+    <div class="puzzle" id="puzzle"></div>
+    <div class="input-area" id="inputArea"></div>
+    <div class="result" id="warning"></div>
+    <div class="hint">
+      <button onclick="getHint()">🔍 Hint</button>
+    </div>
+  </div>
+
+  <div id="customModal" class="modal">
+    <div class="modal-content">
+      <span class="close" onclick="closeCustomModal()">&times;</span>
+      <h2>Custom Puzzle</h2>
+      <div class="modal-input">
+        <label for="customWord1">First Word:</label>
+        <input type="text" id="customWord1" placeholder="e.g. SEND">
+      </div>
+      <div class="modal-input">
+        <label for="customWord2">Second Word:</label>
+        <input type="text" id="customWord2" placeholder="e.g. MORE">
+      </div>
+      <div class="modal-input">
+        <label for="customResult">Result:</label>
+        <input type="text" id="customResult" placeholder="e.g. MONEY">
+      </div>
+      <button onclick="checkCustomPuzzle()">Check Puzzle</button>
+      <div id="custom-loading" style="display:none; margin-top:10px;">⏳ Solving puzzle, please wait...</div>
+      <div id="custom-result"></div>
+      <div id="solution-display"></div>
+    </div>
+  </div>
+
+  <script>
+    let letters = [];
+    let score = 0;
+    let currentDifficulty = "easy";
+    let totalPuzzles = 5;
+
+    function updateScore(change) {
+      score = Math.max(0, score + change);
+      const scoreEl = document.getElementById('score');
+      scoreEl.textContent = `Score: ${score}`;
+    }
+
+    function padWord(word, totalLength) {
+      return ' '.repeat(totalLength - word.length) + word;
+    }
+
+    function showLoader(show) {
+      document.getElementById('loader').style.display = show ? 'block' : 'none';
+      document.getElementById('game-container').classList.toggle('loading', show);
+    }
+
+    function loadPuzzle() {
+      score = 0;
+      updateScore(0);
+      document.getElementById('warning').textContent = '';
+      document.getElementById('puzzle').innerHTML = '';
+      document.getElementById('inputArea').innerHTML = '';
+      showLoader(true);
+
+      currentDifficulty = document.getElementById('difficulty').value;
+      fetch('/crypt-arithmetic/get-puzzle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ difficulty: currentDifficulty })
+      })
+      .then(res => res.json())
+      .then(data => {
+        showLoader(false);
+        if (data.error) {
+          document.getElementById('warning').textContent = data.error;
+          return;
+        }
+        
+        letters = data.letters || [];
+        const maxLength = Math.max(data.word1.length, data.word2.length, data.result.length);
+
+        const line1 = padWord(data.word1, maxLength);
+        const line2 = '+' + padWord(data.word2, maxLength - 1);
+        const line3 = '-'.repeat(maxLength);
+        const line4 = padWord(data.result, maxLength);
+
+        document.getElementById('puzzle').innerHTML = `${line1}\n${line2}\n${line3}\n${line4}`;
+        document.getElementById('totalPuzzles').textContent = `/ ${data.total || 5}`;
+        totalPuzzles = data.total || 5;
+
+        const inputArea = document.getElementById('inputArea');
+        inputArea.innerHTML = '';
+        letters.forEach(letter => {
+          const box = document.createElement('div');
+          box.className = 'letter-box';
+          box.innerHTML = `<strong>${letter}</strong><input maxlength="1" id="input-${letter}" onkeydown="if(event.key==='Enter'){checkLetter('${letter}')}"/><div id="mark-${letter}"></div>`;
+          inputArea.appendChild(box);
+        });
+      });
+    }
+
+    function jumpToPuzzle() {
+      const indexInput = document.getElementById('puzzleIndex');
+      let index = parseInt(indexInput.value) - 1;
+
+      if (isNaN(index) || index < 0) {
+        document.getElementById('warning').textContent = '❗ Please enter a valid number.';
+        return;
+      }
+
+      if (index >= totalPuzzles) {
+        index = totalPuzzles - 1;
+        indexInput.value = totalPuzzles;
+      }
+
+      showLoader(true);
+      document.getElementById('warning').textContent = '';
+      document.getElementById('puzzle').innerHTML = '';
+      document.getElementById('inputArea').innerHTML = '';
+
+      currentDifficulty = document.getElementById('difficulty').value;
+      fetch('/crypt-arithmetic/get-puzzle-by-index', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          difficulty: currentDifficulty,
+          index: index
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+        showLoader(false);
+
+        if (data.error) {
+          document.getElementById('warning').textContent = data.error;
+          return;
+        }
+
+        letters = data.letters || [];
+        const maxLength = Math.max(data.word1.length, data.word2.length, data.result.length);
+
+        const line1 = padWord(data.word1, maxLength);
+        const line2 = '+' + padWord(data.word2, maxLength - 1);
+        const line3 = '-'.repeat(maxLength);
+        const line4 = padWord(data.result, maxLength);
+
+        document.getElementById('puzzle').innerHTML = `${line1}\n${line2}\n${line3}\n${line4}`;
+        document.getElementById('puzzleIndex').value = index + 1;
+
+        const inputArea = document.getElementById('inputArea');
+        inputArea.innerHTML = '';
+        letters.forEach(letter => {
+          const box = document.createElement('div');
+          box.className = 'letter-box';
+          box.innerHTML = `<strong>${letter}</strong><input maxlength="1" id="input-${letter}" onkeydown="if(event.key==='Enter'){checkLetter('${letter}')}"/><div id="mark-${letter}"></div>`;
+          inputArea.appendChild(box);
+        });
+      });
+    }
+
+    function checkLetter(letter) {
+      const input = document.getElementById(`input-${letter}`);
+      const val = input.value;
+      if (!/^[0-9]$/.test(val)) return;
+
+      fetch('/crypt-arithmetic/check-letter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ letter: letter, digit: val })
+      })
+      .then(res => res.json())
+      .then(data => {
+        const mark = document.getElementById(`mark-${letter}`);
+        if (data.conflict) {
+          document.getElementById('warning').textContent = '⚠️ Digit already assigned to another letter!';
+          mark.innerHTML = '<span class="cross">❌</span>';
+          updateScore(-2);
+        } else {
+          document.getElementById('warning').textContent = '';
+          if (data.correct) {
+            input.disabled = true;
+            mark.innerHTML = '<span class="tick">✅</span>';
+            updateScore(5);
+          } else {
+            mark.innerHTML = '<span class="cross">❌</span>';
+            updateScore(-2);
+          }
+        }
+      });
+    }
+
+    function getHint() {
+      fetch('/crypt-arithmetic/get-hint')
+      .then(res => res.json())
+      .then(data => {
+        if (data.done) return;
+        const input = document.getElementById(`input-${data.letter}`);
+        input.value = data.digit;
+        input.disabled = true;
+        document.getElementById(`mark-${data.letter}`).innerHTML = '<span class="tick">✅</span>';
+        updateScore(-3);
+      });
+    }
+
+    function openCustomModal() {
+      document.getElementById('customModal').style.display = 'block';
+      document.getElementById('custom-result').textContent = '';
+      document.getElementById('solution-display').textContent = '';
+    }
+
+    function closeCustomModal() {
+      document.getElementById('customModal').style.display = 'none';
+    }
+
+    function checkCustomPuzzle() {
+      const word1 = document.getElementById('customWord1').value.toUpperCase();
+      const word2 = document.getElementById('customWord2').value.toUpperCase();
+      const result = document.getElementById('customResult').value.toUpperCase();
+
+      const resultEl = document.getElementById('custom-result');
+      const solutionEl = document.getElementById('solution-display');
+      const loadingEl = document.getElementById('custom-loading');
+
+      resultEl.textContent = '';
+      solutionEl.textContent = '';
+      loadingEl.style.display = 'block';
+
+      if (!word1 || !word2 || !result) {
+        resultEl.textContent = 'Please fill in all fields';
+        resultEl.style.color = 'red';
+        loadingEl.style.display = 'none';
+        return;
+      }
+
+      if (!/^[A-Z]+$/.test(word1) || !/^[A-Z]+$/.test(word2) || !/^[A-Z]+$/.test(result)) {
+        resultEl.textContent = 'Only letters A-Z are allowed';
+        resultEl.style.color = 'red';
+        loadingEl.style.display = 'none';
+        return;
+      }
+
+      fetch('/crypt-arithmetic/check-custom', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ word1, word2, result })
+      })
+      .then(res => res.json())
+      .then(data => {
+        loadingEl.style.display = 'none';
+
+        if (data.error) {
+          resultEl.textContent = data.error;
+          resultEl.style.color = 'red';
+          solutionEl.textContent = '';
+          return;
+        }
+
+        if (data.solvable) {
+          resultEl.textContent = 'Puzzle is solvable!';
+          resultEl.style.color = 'green';
+
+          let solutionText = 'Solution:\n';
+          for (const [letter, digit] of Object.entries(data.solution)) {
+            solutionText += `${letter} = ${digit}\n`;
+          }
+          solutionEl.textContent = solutionText;
+        } else {
+          resultEl.textContent = 'Puzzle is not solvable';
+          resultEl.style.color = 'red';
+          solutionEl.textContent = '';
+        }
+      });
+    }
+
+    window.onclick = function(event) {
+      const modal = document.getElementById('customModal');
+      if (event.target == modal) {
+        closeCustomModal();
+      }
+    }
+
+    window.onload = loadPuzzle;
+  </script>
+</body>
+</html>

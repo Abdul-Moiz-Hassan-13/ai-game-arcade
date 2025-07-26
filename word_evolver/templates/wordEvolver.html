@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Genetic Algorithm Word Evolver</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background: #f0f4f8;
+      display: flex;
+      flex-direction: row;
+      gap: 40px;
+    }
+    .left, .right {
+      flex: 1;
+    }
+    h1, h2 {
+      color: #333;
+    }
+    input[type="text"] {
+      padding: 10px;
+      font-size: 16px;
+      width: 80%;
+      margin-bottom: 10px;
+    }
+    button {
+      padding: 10px 15px;
+      margin: 5px 10px 5px 0;
+      font-size: 16px;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    .log-box {
+      background: #ffffff;
+      padding: 15px;
+      border-left: 5px solid #007bff;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      margin-top: 20px;
+    }
+    .log-box p {
+      margin: 5px 0;
+    }
+    #status {
+      margin-top: 10px;
+      font-weight: bold;
+      color: #444;
+    }
+    #historyCard {
+      background: white;
+      border: 1px solid #ccc;
+      border-left: 5px solid #007bff;
+      padding: 10px;
+      max-height: 500px;
+      overflow-y: auto;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    ul {
+      padding-left: 20px;
+      list-style-type: disc;
+      margin: 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="left">
+    <h1>🧬 Genetic Algorithm Word Evolver</h1>
+    <input type="text" id="targetInput" placeholder="Enter your target sentence">
+    <div>
+      <button onclick="start()">Start</button>
+      <button onclick="nextGen()">Next Generation</button>
+      <button onclick="autoRun()">Auto-Run</button>
+      <button onclick="resetGame()">Reset</button>
+    </div>
+
+    <div id="status"></div>
+
+    <div class="log-box" id="calcBox">
+      <strong>Calculations:</strong>
+      <div id="calculations"></div>
+    </div>
+  </div>
+
+  <div class="right">
+    <h2>Evolution History</h2>
+    <div id="historyCard">
+      <ul id="historyList"></ul>
+    </div>
+  </div>
+
+  <script>
+    let target = "";
+    let autoInterval = null;
+
+    function start() {
+      target = document.getElementById('targetInput').value.trim();
+      if (!target) return alert("Please enter a target sentence.");
+      fetch('/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ target: target })
+      })
+      .then(res => res.json())
+      .then(data => {
+        document.getElementById("historyList").innerHTML = "";
+        document.getElementById("status").innerText = "Started evolving toward: " + target;
+        document.getElementById("calculations").innerHTML = "";
+      });
+    }
+
+    function nextGen() {
+      if (!target) return alert("Start the game first by entering a target sentence.");
+      fetch('/next-generation')
+        .then(res => res.json())
+        .then(data => {
+          document.getElementById("status").innerText = data.explanation;
+
+          const li = document.createElement('li');
+          li.textContent = `Gen ${data.generation}: ${data.best} (${data.fitness} match)`;
+          document.getElementById("historyList").appendChild(li);
+
+          const calcBox = document.getElementById("calculations");
+          let html = "";
+
+          html += `<p><strong>Crossover Pairs:</strong></p><ul>`;
+          data.calculations.crossover_log.slice(0, 5).forEach(([p1, p2, child]) => {
+            html += `<li>${p1} + ${p2} → ${child}</li>`;
+          });
+          html += `</ul>`;
+
+          html += `<p><strong>Mutations:</strong></p><ul>`;
+          data.calculations.mutation_log.slice(0, 5).forEach(([before, after]) => {
+            html += `<li>${before} → ${after}</li>`;
+          });
+          html += `</ul>`;
+
+          html += `<p><strong>Formula:</strong> ${data.calculations.formula}</p>`;
+
+          calcBox.innerHTML = html;
+
+          if (data.done) {
+            clearInterval(autoInterval);
+            alert("🎉 Target sentence evolved successfully!");
+          }
+        });
+    }
+
+    function autoRun() {
+      if (!target) return alert("Start the game first by entering a target sentence.");
+      if (autoInterval) {
+        clearInterval(autoInterval);
+        autoInterval = null;
+        return;
+      }
+      autoInterval = setInterval(nextGen, 300);
+    }
+
+    function resetGame() {
+      fetch('/reset', { method: 'POST' })
+        .then(res => res.json())
+        .then(() => {
+          target = "";
+          clearInterval(autoInterval);
+          autoInterval = null;
+          document.getElementById('targetInput').value = "";
+          document.getElementById('status').innerText = "";
+          document.getElementById("historyList").innerHTML = "";
+          document.getElementById("calculations").innerHTML = "";
+        });
+    }
+  </script>
+</body>
+</html>
